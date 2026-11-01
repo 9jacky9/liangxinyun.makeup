@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Windows客户端TUN虚拟网卡模式与系统代理有什么区别？一文读懂全局接管原理 - 良心云</title>
+  <meta name="description" content="为什么开了系统代理后，命令行终端、UWP应用和桌面软件还是连不上网？深入浅出讲透TUN虚拟网卡的底层接管优势。">
+  <link rel="canonical" href="https://liangxinyun.makeup/windows-tun-mode-vs-system-proxy-explained.html">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="champagne-header">
+  <div class="shell-wrap header-bar">
+    <a href="index.html" class="twin-brand" aria-label="良心云首页">
+      <svg class="twin-logo-svg" viewBox="0 0 52 46" width="46" height="40" aria-hidden="true">
+  <defs>
+    <linearGradient id="amberHeartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="roseHeartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185"/>
+      <stop offset="100%" stop-color="#BE123C"/>
+    </linearGradient>
+  </defs>
+  <!-- Left Golden Wing Heart -->
+  <path d="M21 38C21 38 5 28 5 15.5C5 9.8 9.4 5.5 14.8 5.5C18 5.5 21 7.8 21 7.8C21 7.8 24 5.5 27.2 5.5C32.6 5.5 37 9.8 37 15.5C37 28 21 38 21 38Z" fill="url(#amberHeartGrad)" opacity="0.88"/>
+  <!-- Right Intertwined Rose Heart -->
+  <path d="M31 40C31 40 15 30 15 17.5C15 11.8 19.4 7.5 24.8 7.5C28 7.5 31 9.8 31 9.8C31 9.8 34 7.5 37.2 7.5C42.6 7.5 47 11.8 47 17.5C47 30 31 40 31 40Z" fill="url(#roseHeartGrad)" opacity="0.88"/>
+  <!-- Gentle Silk Cloud Contour -->
+  <path d="M16 26.5H35.5C38 26.5 40 24.6 40 22.2C40 20 38.2 18.2 36 18C35.2 14.8 32.3 12.5 28.8 12.5C25.6 12.5 22.9 14.4 21.8 17.2C21.2 17 20.5 16.8 19.8 16.8C16.9 16.8 14.5 19.1 14.5 22C14.5 24.5 15.2 26.5 16 26.5Z" fill="#FDF8F5" opacity="0.92"/>
+</svg>
+      <div class="twin-brand-titles">
+        <span class="twin-brand-name">良心云</span>
+        <span class="twin-brand-sub">以心相伴 · 温暖如丝</span>
+      </div>
+    </a>
+    <nav class="silk-nav" aria-label="主导航">
+      <ul class="silk-nav-links">
+        <li><a href="index.html#heart-pledge" class="silk-link">温度与初心</a></li>
+        <li><a href="index.html#silk-scenes" class="silk-link">视听与灵感</a></li>
+        <li><a href="index.html#gentle-tiers" class="silk-link">心意方案</a></li>
+        <li><a href="index.html#warm-dialog" class="silk-link">坦诚问答</a></li>
+        <li><a href="index.html#user-letters" class="silk-link">用户来信</a></li>
+        <li><a href="warm-compass.html" class="silk-link active-silk">暖心指南</a></li>
+      </ul>
+      <a href="https://ww012.twilightaff.com/#/?code=A56DH1Af" rel="nofollow" target="_blank" class="silk-cta-pill">开启心意连接</a>
+    </nav>
+  </div>
+</header>
+  <main class="shell-wrap">
+    <article class="paper-reader">
+      <div class="paper-meta">
+        <span>专栏：<a href="warm-compass.html">暖心指南</a></span> · <span>主题：技术讲堂</span> · <span>出品：良心云人文网络内容组</span>
+      </div>
+      <h1>Windows客户端TUN虚拟网卡模式与系统代理有什么区别？一文读懂全局接管原理</h1>
+      
+<p>在使用Windows或macOS电脑配置网络加速客户端时，几乎每位用户都会在主界面上看到两个核心开关：“系统代理（System Proxy）”与“TUN模式（虚拟网卡模式）”。许多朋友平时只开启了系统代理，结果发现用Chrome浏览器看海外网页一切正常，但一旦打开桌面版Notion、Telegram、命令行Git工具或是某些独立客户端软件，却依然提示网络连接超时。这究竟是怎么回事？今天我们就用最通俗易懂的语言，彻底讲清这两种模式的底层差异与最佳搭配方案。</p>
+
+<h2>一、什么是“系统代理”？为什么它管不住所有软件？</h2>
+<p>要理解为什么有些软件“不听话”，首先要明白系统代理的工作机制。开启系统代理后，加速客户端实际上只是在Windows操作系统的注册表（Internet选项）中写下了一行礼貌的建议：“请各位软件把网络请求发往本地的127.0.0.1特定端口”。</p>
+
+<h3>1. 君子协定式的自愿遵守机制</h3>
+<p>注意，系统代理本质上只是一项“非强制性的君子协定”。像Chrome、Edge、Firefox等主流网页浏览器，天生非常遵守系统规范，启动时会自动读取这项设置，乖乖把流量交给加速客户端处理，因此浏览器上网体验非常顺畅。</p>
+
+<h3>2. 无视系统代理的三类常见应用</h3>
+<p>然而，电脑中还有大量软件天生不会去读取系统的HTTP代理配置。第一类是各种命令行开发工具（如CMD、PowerShell、Git、Docker、npm等）；第二类是Windows应用商店下载的UWP沙盒应用；第三类则是许多直接调用底层Socket或UDP通信的跨国办公软件、创意设计套件与联机游戏。对于这些软件而言，只开系统代理就等于完全没有加速。</p>
+
+<h2>二、什么是“TUN虚拟网卡模式”？真正的三层网络全局接管</h2>
+<p>为了解决上述软件各自为政的难题，现代加速客户端引入了强大的TUN（网络隧道虚拟网卡）技术。参考<a href="https://tizilab.net/" target="_blank">PC端全局代理与TUN模式实测教程</a>中的架构解析，我们可以把TUN模式理解成在你的电脑里插入了一张虚拟的高速网卡。</p>
+
+<h3>1. 从操作系统网络层（Layer 3）直接拦截</h3>
+<p>当你打开TUN模式开关时，客户端会在系统底层创建一个虚拟网络适配器，并通过修改系统路由表，将整台电脑发出的所有IP数据包（无论是TCP还是UDP协议）统统引导至这张虚拟网卡中。此时，无论某个桌面软件是否支持配置代理，它发出的每一个字节都必须经过TUN网卡的统一调度。</p>
+
+<h3>2. 配合Fake-IP实现零泄漏闪电分流</h3>
+<p>更巧妙的是，TUN模式通常会与Fake-IP（虚拟地址池）技术协同工作。当桌面软件尝试解析某个海外域名时，TUN网卡会在一毫秒内立即返回一个虚拟内网IP，随后将真实的域名请求通过加密专线发送至海外节点完成解析与连接，既彻底根治了DNS污染，又让软件连接速度大幅跃升。</p>
+
+<h2>三、日常使用中，我们该如何正确选择与切换？</h2>
+<p>既然TUN模式如此强大，是不是意味着任何时候都应该无脑开启它呢？根据不同的使用场景，科学切换才能获得最稳健的体验。</p>
+
+<h3>1. 轻度网页浏览与音乐视频：系统代理足够轻巧</h3>
+<p>如果你平时只是用浏览器查阅资料、刷YouTube 4K视频或使用支持手动填写代理端口的软件，那么单独开启“系统代理”即可。它的优势在于不需要申请操作系统管理员权限，对本地局域网打印共享或企业内网VPN软件的兼容性最为温和。</p>
+
+<h3>2. 远程开发、AI桌面端与全能办公：果断开启TUN模式</h3>
+<p>当你需要使用Cursor、VS Code远程插件、桌面版Claude/ChatGPT客户端、跨国会议软件或进行命令行代码拉取时，请务必以管理员身份运行客户端并开启“TUN模式”。配合精细化的大陆白名单分流规则，TUN模式能像隐形管家一样精准接管所有海外桌面应用，同时让国内软件丝滑直连，彻底告别反复配置环境变量的烦恼。</p>
+
+      <div class="paper-cta-panel">
+        <h3>寻找一份不玩套路、晚高峰丝绸般顺滑的加速陪伴？</h3>
+        <p>良心云坚持1:1透明流量与高纯净原生IP专线，让您的每一次连接都安心从容。</p>
+        <p style="margin-top:14px;">
+          <a href="https://ww012.twilightaff.com/#/?code=A56DH1Af" rel="nofollow" target="_blank" class="btn-warm-trial">立即体验良心云</a>
+        </p>
+      </div>
+    </article>
+  </main>
+  <footer class="champagne-footer">
+  <div class="shell-wrap footer-stack">
+    <div class="footer-emblem">
+      <svg viewBox="0 0 36 28" width="32" height="24" aria-hidden="true">
+        <path d="M14 25C14 25 3 18 3 9.5C3 5.5 6.2 2.5 10 2.5C12.2 2.5 14 4.2 14 4.2C14 4.2 15.8 2.5 18 2.5C21.8 2.5 25 5.5 25 9.5C25 18 14 25 14 25Z" fill="#D97706"/>
+        <path d="M22 26C22 26 11 19 11 10.5C11 6.5 14.2 3.5 18 3.5C20.2 3.5 22 5.2 22 5.2C22 5.2 23.8 3.5 26 3.5C29.8 3.5 33 6.5 33 10.5C33 19 22 26 22 26Z" fill="#BE123C" opacity="0.85"/>
+      </svg>
+      <strong>良心云</strong>
+      <span>— 让每一次远方连接都保有温度与诚意</span>
+    </div>
+    <nav class="footer-legal-nav" aria-label="页脚导航">
+      <a href="sitemap.html">网站地图</a>
+      <a href="about.html">关于我们</a>
+      <a href="terms.html">服务条款</a>
+      <a href="privacy.html">隐私政策</a>
+    </nav>
+    <p class="footer-note">© 2026 良心云 版权所有 · 丝绸般顺滑的全球网络加速体验</p>
+  </div>
+</footer>
+</body>
+</html>
